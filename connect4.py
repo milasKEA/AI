@@ -4,6 +4,9 @@ import copy
 ROWS = 6
 COLS = 7
 
+node_count = 0
+
+
 def create_board():
     return [[' ' for _ in range(COLS)] for _ in range(ROWS)]
 
@@ -84,10 +87,21 @@ def score_position(board, piece):
 def get_valid_locations(board):
     return [c for c in range(COLS) if is_valid_location(board, c)]
 
+def score_move(board, col, piece):
+    row = get_next_open_row(board, col)
+    drop_piece(board, row, col, piece)
+    score = score_position(board, piece)
+    board[row][col] = ' '  # Undo move
+    return score
+
+
 def is_terminal_node(board):
     return winning_move(board, 'X') or winning_move(board, 'O') or len(get_valid_locations(board)) == 0
 
 def minimax(board, depth, alpha, beta, maximizingPlayer):
+    global node_count
+    node_count += 1
+
     valid_locations = get_valid_locations(board)
     is_terminal = is_terminal_node(board)
     if depth == 0 or is_terminal:
@@ -100,36 +114,41 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
                 return (None, 0)
         else:
             return (None, score_position(board, 'O'))
+
+    # Sorter træk heuristisk og prioritér midten
+    valid_locations.sort(key=lambda col: score_move(board, col, 'O'), reverse=True)
+
     if maximizingPlayer:
         value = -math.inf
-        best_col = None
+        best_col = valid_locations[0]
         for col in valid_locations:
             row = get_next_open_row(board, col)
-            temp_board = copy.deepcopy(board)
-            drop_piece(temp_board, row, col, 'O')
-            new_score = minimax(temp_board, depth - 1, alpha, beta, False)[1]
+            drop_piece(board, row, col, 'O')
+            new_score = minimax(board, depth - 1, alpha, beta, False)[1]
+            board[row][col] = ' '  # Undo move
             if new_score > value:
                 value = new_score
                 best_col = col
             alpha = max(alpha, value)
             if alpha >= beta:
                 break
-        return best_col, value
     else:
         value = math.inf
-        best_col = None
+        best_col = valid_locations[0]
         for col in valid_locations:
             row = get_next_open_row(board, col)
-            temp_board = copy.deepcopy(board)
-            drop_piece(temp_board, row, col, 'X')
-            new_score = minimax(temp_board, depth - 1, alpha, beta, True)[1]
+            drop_piece(board, row, col, 'X')
+            new_score = minimax(board, depth - 1, alpha, beta, True)[1]
+            board[row][col] = ' '  # Undo move
             if new_score < value:
                 value = new_score
                 best_col = col
             beta = min(beta, value)
             if alpha >= beta:
                 break
-        return best_col, value
+
+    return best_col, value
+
 
 def human_move(board, piece):
     valid_move = False
@@ -145,6 +164,7 @@ def human_move(board, piece):
     return col
 
 def play_game(two_players=False):
+    global node_count
     board = create_board()
     game_over = False
     turn = 0
@@ -158,7 +178,10 @@ def play_game(two_players=False):
                 col = human_move(board, 'O')
             else:
                 print("AI tænker...")
+                node_count = 0  # Nulstil før hvert kald
                 col, _ = minimax(board, 4, -math.inf, math.inf, True)
+                print(f"AI besøgte {node_count} nodes ved dybde 4.")
+
 
         if is_valid_location(board, col):
             row = get_next_open_row(board, col)
